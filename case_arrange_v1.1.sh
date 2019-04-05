@@ -1,6 +1,9 @@
 #!/bin/sh
 
 CASEPATH=`pwd`
+RUSER='root'
+RADDR='10.1.0.177'
+RPATH='/data/REPO/casefile'
 
 #grep "case_list_man.sh" /etc/crontab &> /dev/null
 #if [ $? -eq 1 ]
@@ -45,6 +48,7 @@ else
 	echo "Undefined Account number"
 	echo "Check caseList.csv"
 	echo ""
+	exit
 fi
 
 if [ ! -d $CASEPATH/$CASEDIR/ ]
@@ -52,18 +56,19 @@ then
 	mkdir $CASEPATH/$CASEDIR/
 fi
 
-if [ ! -f $CASEPATH/caselist.txt ]
+if [ ! -f $CASEPATH/$CASEDIR/caselist.txt ]
 then
 	if [ -f $CASEPATH/$CASEDIR/*.html ]
 	then
-		ls -1 $CASEPATH/$CASEDIR/*.html | awk -F "." '{print $1}' | sort >> caselist.txt	
+		ls -1 $CASEPATH/$CASEDIR/*.html | awk -F "." '{print $1}' | sort >> $CASEPATH/$CASEDIR/caselist.txt	
 	else
-		touch caselist.txt
+		touch $CASEPATH/$CASEDIR/caselist.txt
 	fi
 fi
 
-sed '1d' caseList.csv | grep -v 'Waiting on' | awk -F "," '{print $2}' | sort > tmp.caselist.txt
-diff caselist.txt tmp.caselist.txt | sed -n '/>/p' | awk -F " " '{print $2}' > tmp.difflist.txt
+cd $CASEPATH/$CASEDIR
+sed '1d' ../caseList.csv | grep -v 'Waiting on' | awk -F "," '{print $2}' | sort > $CASEPATH/$CASEDIR/tmp.caselist.txt
+diff caselist.txt tmp.caselist.txt | sed -n '/>/p' | awk -F " " '{print $2}' > $CASEPATH/$CASEDIR/tmp.difflist.txt
 
 if [ `cat tmp.difflist.txt | wc -l ` -eq 0 ]
 then
@@ -79,7 +84,7 @@ echo "=== Start Case donwloading ==="
 for i in `cat tmp.difflist.txt`
 do
 	echo -n "${i} Download..."
-	CASEADDR=`awk -F "," -v CASE=$i '{if($2==CASE){print $14}}' caseList.csv`
+	CASEADDR=`awk -F "," -v CASE=$i '{if($2==CASE){print $14}}' ../caseList.csv`
 	curl -u ${USERID}:${USERPASS} $CASEADDR -o $CASEPATH/$CASEDIR/${i}.html &> /dev/null
 
 	if [ ! $? -eq 0 ]
@@ -87,7 +92,18 @@ do
 		echo $CASEADDR >> failed_list.txt
 		echo -e "[\e[1;31mFail\e[0m]"
 	else
-		echo -e "[\e[1;32mOK\e[0m]"
+		grep "<code>403" $CASEPATH/$CASEDIR/${i}.html &> /dev/null
+		if [ $? -eq 0 ]
+		then
+			echo ""
+			echo "Login Failed!!!!!!!"
+			echo "Check your ID or PW"
+			echo ""
+			rm -f $CASEPATH/$CASEDIR/${i}.html
+			exit
+		else
+			echo -e "[\e[1;32mOK\e[0m]"
+		fi
 	fi
 
 	while [ -f failed_list.txt ]
@@ -101,7 +117,18 @@ do
 				echo $CASEADDR >> failed_list2.txt
 				echo -e "[\e[1;31mFail\e[0m]"
 			else
-				echo -e "[\e[1;32mOK\e[0m]"
+				grep "<code>403" $CASEPATH/$CASEDIR/${i}.html &> /dev/null
+				if [ ! $? -eq 0 ]
+				then
+					echo ""
+					echo "Login Failed!!!!!!!"
+					echo "Check your ID or PW"
+					echo ""
+					rm -f $CASEPATH/$CASEDIR/${i}.html
+					exit
+				else
+					echo -e "[\e[1;32mOK\e[0m]"
+				fi
 			fi
 		done
 
@@ -114,18 +141,23 @@ do
 	done
 done
 
-cd $CASEPATH/$CASEDIR
 for i in `ls -1 ./*.html`
 do
-	sh ../beauty.sh $i
-	echo "${i} has been arranged successfully"
+	../beauty.sh $i
+	if [ $? -eq 0 ]
+	then
+		echo "${i} has been arranged successfully"
+	else
+		echo "${i} failed..."
+	fi
 done
 
-cd ..
 rm -f tmp.difflist.txt
 mv tmp.caselist.txt caselist.txt
+mv ../caseList.csv .
 chmod 600 caselist.txt
-mv caseList.csv $CASEPATH/$CASEDIR
+cd ..
 echo ""
+scp -r $CASEDIR $RUSER@$RADDR:$RPATH
 echo -e "\e[1;31mWell Done\e[0m"
 echo ""
