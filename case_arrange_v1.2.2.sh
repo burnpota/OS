@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash 
 
 ###Variables about path or file name
 CASEPATH=`pwd`
