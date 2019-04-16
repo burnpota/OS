@@ -66,7 +66,7 @@ printf "
 }
 
 function print_end(){
-printf "\033[1;31mWell Done\033[0m\n"
+	printf "\033[1;31mWell Done\033[0m\n"
 }
 
 function print_OK(){
@@ -79,9 +79,11 @@ function print_fail(){
 
 function print_error(){
 	printf "[\033[1;31mERROR\033[0m]\n"
+}
 
 function print_notice(){
 	printf "[\033[1;31mNOTICE\033[0m]\n"
+}
 
 ##########################
 ### Functions for Checking
